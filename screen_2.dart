@@ -1,27 +1,33 @@
 import 'package:flutter/material.dart';
 import 'MyPopupScreen.dart';
-import 'Widget_stena1.dart';
 
 class Screen2 extends StatefulWidget {
   final List<int> selectedImageIDs;
 
-
-  const Screen2({Key? key, required this.selectedImageIDs}) : super(key: key);
+  Screen2({Key? key, required this.selectedImageIDs}) : super(key: key);
 
   @override
-  State<Screen2> createState() => _Screen2State();
+  _Screen2State createState() => _Screen2State();
 }
 
 class _Screen2State extends State<Screen2> {
+  ImageProvider _defaultImage = AssetImage('assets/images/image1.png');
+  ImageProvider _image = AssetImage('assets/images/image1.png');
   String? _selectedFileName;
   double _left = 0;
   double _dragStart = 0;
+
+  void _updateImage(ImageProvider image) {
+    setState(() {
+      _image = image;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Выбор отделки '),
+        title: const Text('Выбор отделки'),
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.start,
@@ -70,29 +76,46 @@ class _Screen2State extends State<Screen2> {
                                   'assets/images/img2_${widget.selectedImageIDs.sublist(widget.selectedImageIDs.length - 2, widget.selectedImageIDs.length)[1]}.png',
                                   fit: BoxFit.cover,
                                 ),
-
+                              ),
+                              Positioned.fill(
+                                child: Image(
+                                  image: _image,
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ],
                           ),
                         ),
                         Positioned(
-                          top: 300.0,
-                          left: 290.0,
-                          child: MyInkWell(
-                            onTap: () {
-                              showDialog(
-                                context: context,
-                                barrierDismissible: true,
-                                builder: (BuildContext context) {
-                                  return Align(
-                                    alignment: Alignment.bottomCenter,
-                                    child: FractionallySizedBox(
-                                      child: MyPopupScreen(),
-                                    ),
+                          top: 280,
+                          left: 00,
+                          right: 0,
+                          child: Center(
+                            child: SizedBox(
+                              width: 50.0,
+                              height: 50.0,
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  var fileName = await showDialog<String>(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return MyPopupScreen(
+                                        onFileSelected: (fileName) {
+                                          _selectedFileName = fileName;
+                                        },
+                                      );
+                                    },
                                   );
+                                  if (fileName != null) {
+                                    setState(() {
+                                      _image = AssetImage(fileName);
+                                    });
+                                  }
                                 },
-                              );
-                            },
+                                child: Icon(Icons.photo_library),
+                                //child: Icon(Icons.photo_library),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -102,20 +125,11 @@ class _Screen2State extends State<Screen2> {
               ),
             ),
           ),
-
-          const SizedBox(height: 10),
-          Text('Selected image IDs: ${widget.selectedImageIDs}'),
-          if (_selectedFileName != null)
-            Text('Selected file name: $_selectedFileName'),
         ],
       ),
     );
   }
-  void _onFileSelected(String fileName) {
-    setState(() {
-      _selectedFileName = fileName;
-    });
-  }
 }
+
 
 
