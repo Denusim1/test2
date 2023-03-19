@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'MyPopupScreen.dart';
+import 'Widget_stena1.dart';
 
 class Screen2 extends StatefulWidget {
   final List<int> selectedImageIDs;
@@ -94,13 +95,15 @@ class _Screen2State extends State<Screen2> {
                             child: SizedBox(
                               width: 50.0,
                               height: 50.0,
-                              child: ElevatedButton(
-                                onPressed: () async {
+                              child: MyInkWell(
+                                onFileSelected: (fileName) async {
                                   var fileName = await showDialog<String>(
                                     context: context,
+                                    barrierColor: Colors.transparent,
                                     builder: (BuildContext context) {
                                       return MyPopupScreen(
                                         onFileSelected: (fileName) {
+
                                           _selectedFileName = fileName;
                                         },
                                       );
@@ -112,7 +115,7 @@ class _Screen2State extends State<Screen2> {
                                     });
                                   }
                                 },
-                                child: Icon(Icons.photo_library),
+
                                 //child: Icon(Icons.photo_library),
                               ),
                             ),
