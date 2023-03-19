@@ -33,6 +33,8 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
     Navigator.pop(context, {'selectedImageNames': _selectedImageNames, 'selectedImageIndexList': _selectedImageIndexList});
   }
 
+
+
   @override
   void initState() {
     super.initState();
@@ -41,14 +43,11 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _screenHeight = MediaQuery.of(context).size.height;
+    return FractionallySizedBox(
+      heightFactor: 0.18,
 
-    return GestureDetector(
-      onVerticalDragEnd: (details) {
-        if (details.primaryVelocity?.isNegative == false) {
-          Navigator.pop(context);
-        }
-      },
+      alignment: Alignment.bottomCenter, // выравнивание внизу
+
       child: AnimatedContainer(
         duration: Duration(milliseconds: 300),
         curve: Curves.easeOut,
@@ -59,20 +58,21 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
           ),
         ),
         width: double.infinity,
-        height: _screenHeight * 0.18,
+
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.end, // спускаем содержимое вниз
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: 10,
                 itemBuilder: (BuildContext context, int index) {
-                  String imageName = 'assets/images/cvet$index.jpg';
+                  String imageName = 'assets/images/cvet1_$index.png';
                   return GestureDetector(
                     onTap: () {
-                      _toggleImageSelection(imageName, index);
-                      widget.onFileSelected?.call(imageName); // call the callback function
+                        widget.onFileSelected?.call(imageName);
+                        _toggleImageSelection(imageName, index);
                     },
                     child: Container(
                       margin: EdgeInsets.all(8.0),
@@ -87,7 +87,7 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
                         ),
                         borderRadius: BorderRadius.circular(5.0),
                         image: DecorationImage(
-                          image: AssetImage(imageName),
+                          image: AssetImage('assets/images/cvet$index.jpg'),
                           fit: BoxFit.cover,
                         ),
                       ),
@@ -113,3 +113,5 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
     );
   }
 }
+
+
