@@ -14,14 +14,19 @@ class Screen2 extends StatefulWidget {
 class _Screen2State extends State<Screen2> {
   ImageProvider _defaultImage = AssetImage('assets/images/image1.png');
   ImageProvider _image = AssetImage('assets/images/image1.png');
-  String? _selectedFileName;
+  String? _selectedImageName;
   double _left = 0;
   double _dragStart = 0;
 
-  void _updateImage(ImageProvider image) {
+  void _updateImage(String fileName) {
     setState(() {
-      _image = image;
+      _selectedImageName = fileName;
+      _image = AssetImage(fileName);
     });
+  }
+
+  void _updateSelectedImage(String fileName) {
+    _updateImage(fileName);
   }
 
   @override
@@ -96,27 +101,7 @@ class _Screen2State extends State<Screen2> {
                               width: 50.0,
                               height: 50.0,
                               child: MyInkWell(
-                                onFileSelected: (fileName) async {
-                                  var fileName = await showDialog<String>(
-                                    context: context,
-                                    barrierColor: Colors.transparent,
-                                    builder: (BuildContext context) {
-                                      return MyPopupScreen(
-                                        onFileSelected: (fileName) {
-
-                                          _selectedFileName = fileName;
-                                        },
-                                      );
-                                    },
-                                  );
-                                  if (fileName != null) {
-                                    setState(() {
-                                      _image = AssetImage(fileName);
-                                    });
-                                  }
-                                },
-
-                                //child: Icon(Icons.photo_library),
+                                onFileSelected: _updateSelectedImage,
                               ),
                             ),
                           ),
