@@ -71,9 +71,10 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
                   String imageName = 'assets/images/cvet1_$index.png';
                   return GestureDetector(
                     onTap: () {
-                        widget.onFileSelected?.call(imageName);
-                        _toggleImageSelection(imageName, index);
+                      _toggleImageSelection(imageName, index);
+                      widget.onFileSelected?.call(imageName);
                     },
+
                     child: Container(
                       margin: EdgeInsets.all(8.0),
                       width: 100.0,
@@ -102,7 +103,12 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
                 child: ElevatedButton(
                   child: Text('Выбрать'),
                   onPressed: () {
-                    Navigator.pop(context, _selectedImageNames.first); // передаем первое выбранное изображение
+                    if (_selectedImageNames.isNotEmpty) {
+                      Navigator.pop(context, _selectedImageNames.first);
+                    } else {
+                      // здесь можно добавить дополнительный код, если список пуст
+                    }
+
                   },
                 ),
               ),
