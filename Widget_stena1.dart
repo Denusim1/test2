@@ -14,13 +14,15 @@ class _MyInkWellState extends State<MyInkWell> {
   AssetImage _image = AssetImage('assets/images/photo_holder.png');
   String _selectedFileName = '';
 
+
   void _onFileSelected(String fileName) {
     setState(() {
       _selectedFileName = fileName;
       _image = AssetImage(fileName);
     });
-    widget.onFileSelected(fileName);
+    widget.onFileSelected(fileName); // pass the selected file name to the callback
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -36,8 +38,8 @@ class _MyInkWellState extends State<MyInkWell> {
         );
       },
       child: Container(
-        width: 50,
-        height: 50,
+        width: 30,
+        height: 30,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
