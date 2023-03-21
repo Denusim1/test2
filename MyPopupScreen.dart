@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'screen_2.dart';
 
 class MyPopupScreen extends StatefulWidget {
   final Function(String)? onFileSelected;
@@ -14,26 +13,11 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
   late String _fileName;
   double _bottomPosition = 0.0;
   double _screenHeight = 0.0;
-  List<String> _selectedImageNames = [];
-  List<int> _selectedImageIndexList = [];
-
-  void _toggleImageSelection(String imageName, int index) {
-    setState(() {
-      if (_selectedImageNames.contains(imageName)) {
-        _selectedImageNames.remove(imageName);
-        _selectedImageIndexList.removeWhere((element) => element == index);
-      } else {
-        _selectedImageNames.add(imageName);
-        _selectedImageIndexList.add(index);
-      }
-    });
-  }
+  String? _selectedImageName;
 
   void _onButtonPressed() {
-    Navigator.pop(context, {'selectedImageNames': _selectedImageNames, 'selectedImageIndexList': _selectedImageIndexList});
+    Navigator.pop(context, {'selectedImageNames': [_selectedImageName!]});
   }
-
-
 
   @override
   void initState() {
@@ -45,9 +29,7 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
   Widget build(BuildContext context) {
     return FractionallySizedBox(
       heightFactor: 0.18,
-
-      alignment: Alignment.bottomCenter, // выравнивание внизу
-
+      alignment: Alignment.bottomCenter,
       child: AnimatedContainer(
         duration: Duration(milliseconds: 300),
         curve: Curves.easeOut,
@@ -58,9 +40,8 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
           ),
         ),
         width: double.infinity,
-
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.end, // спускаем содержимое вниз
+          mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
@@ -71,17 +52,17 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
                   String imageName = 'assets/images/cvet1_$index.png';
                   return GestureDetector(
                     onTap: () {
-                      _toggleImageSelection(imageName, index);
-                      widget.onFileSelected?.call(imageName);
+                      setState(() {
+                        _selectedImageName = imageName;
+                      });
                     },
-
                     child: Container(
                       margin: EdgeInsets.all(8.0),
                       width: 100.0,
                       height: 100.0,
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _selectedImageNames.contains(imageName)
+                          color: _selectedImageName == imageName
                               ? Colors.blue
                               : Colors.grey,
                           width: 1.0,
@@ -101,15 +82,15 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
               height: 50.0,
               child: Center(
                 child: ElevatedButton(
-                  child: Text('Выбрать'),
                   onPressed: () {
-                    if (_selectedImageNames.isNotEmpty) {
-                      Navigator.pop(context, _selectedImageNames.first);
+                    if (_selectedImageName != null) {
+                      Navigator.pop(context, _selectedImageName!);
+                      widget.onFileSelected?.call(_selectedImageName!);
                     } else {
-                      // здесь можно добавить дополнительный код, если список пуст
+                      // Show an error message or do something else
                     }
-
                   },
+                  child: const Text('Выбрать'),
                 ),
               ),
             ),
@@ -119,5 +100,4 @@ class _MyPopupScreenState extends State<MyPopupScreen> {
     );
   }
 }
-
 
