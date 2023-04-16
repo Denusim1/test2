@@ -46,11 +46,11 @@ class _LoginPageState extends State<LoginPage> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       // пользователь уже авторизован, переходим на главный экран приложения
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => HomeScreen(dir: someDirectory),
-        ),
-      );
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen(dir: someDirectory))
+
+    );
     } else {
       // пользователь не авторизован, ничего не делаем
     }
