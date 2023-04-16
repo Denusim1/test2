@@ -1,8 +1,15 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:connectivity/connectivity.dart';
-import 'package:flutter_webview_plugin/flutter_webview_plugin.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../HomeScreen.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'dart:io';
+import 'package:flutter_udid/flutter_udid.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+
 
 class LoginPage extends StatefulWidget {
   @override
@@ -10,49 +17,192 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController usernameController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   String _loginStatus = '';
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FirebaseDatabase _database = FirebaseDatabase.instance;
+  Directory someDirectory = Directory('/path/to/directory');
+  // Запоминание
+  final _formKey = GlobalKey<FormState>();
 
-  Future<String> _makeRequest() async {
-    var url = Uri.parse('https://rostov.vam-balkon.com/page_a/db.txt');
-    var response = await http.get(url);
-    if (response.statusCode == 200) {
-      print(response.body); // выводим тело ответа в консоль
-      var data = response.body;
+  Future<void> autoFillCredentials() async {
+    String udid = await FlutterUdid.udid;
+    DatabaseReference usersRef = FirebaseDatabase.instance.ref().child('users');
+    DatabaseEvent snapshot = await usersRef.orderByChild('udid').equalTo(udid).once();
+    DataSnapshot dataSnapshot = snapshot.snapshot;
+    Map<String, dynamic>? data = dataSnapshot.value as Map<String, dynamic>?;
 
-      var users = LineSplitter().convert(data);
-      for (var user in users) {
-        var userDetails = user.split(':');
-        if (userDetails[0] == usernameController.text &&
-            userDetails[1] == passwordController.text) {
-          bool isConnected = await checkInternetConnection();
-          if (isConnected) {
-            Navigator.pushNamed(context, '/screen1');
-          } else {
-            setState(() {
-              _loginStatus = 'No internet connection';
-            });
-          }
-          return 'Успешная авторизация';
-        }
-      }
-      return 'Ошибка авторизации! Обратитесь в поддержку ';
-    } else {
-      return 'Нет соединения с сервером';
+    if (data != null) {
+      String email = data.values.first['email'];
+      String password = data.values.first['password'];
+      _emailController.text = email;
+      _passwordController.text = password;
+      _rememberMe = true;
     }
   }
 
+  bool _rememberMe = false;
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedData();
+    autoFillCredentials();
 
-  void _login() async {
+  }
+
+  _loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String email = prefs.getString('email') ?? '';
+    String password = prefs.getString('password') ?? '';
+    _emailController.text = email;
+    _passwordController.text = password;
+  }
+
+
+  void _loadSavedData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _loginStatus = 'Logging in...';
-    });
-    String result = await _makeRequest();
-    setState(() {
-      _loginStatus = result;
+      _emailController.text = prefs.getString('email') ?? '';
+      _passwordController.text = prefs.getString('password') ?? '';
+      _rememberMe = prefs.getBool('rememberMe') ?? false;
     });
   }
+  void _saveData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setString('email', _emailController.text);
+    prefs.setString('password', _passwordController.text);
+    prefs.setBool('rememberMe', _rememberMe);
+  }
+
+
+  Future<UserCredential> signInWithGoogle() async {
+    final GoogleSignInAccount? googleSignInAccount = await _googleSignIn.signIn();
+    final GoogleSignInAuthentication googleSignInAuthentication = await googleSignInAccount!.authentication;
+    final AuthCredential credential = GoogleAuthProvider.credential(
+      accessToken: googleSignInAuthentication.accessToken,
+      idToken: googleSignInAuthentication.idToken,
+    );
+    final UserCredential userCredential = await _auth.signInWithCredential(credential);
+
+    return userCredential;
+  }
+
+
+  Future<void> _login() async {
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() {
+        _loginStatus = 'Введите имя пользователя и пароль';
+      });
+      return;
+    }
+    try {
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      String token = userCredential.user!.uid;
+      String udid = await FlutterUdid.udid;
+
+      bool isTokenValid = await _checkToken(token, udid );
+      print(token);
+
+      if (isTokenValid) {
+        Navigator.push(
+          context,
+           MaterialPageRoute(builder: (context) => HomeScreen(dir: someDirectory)),
+        );
+      } else {
+        setState(() {
+          _loginStatus = 'Неверный логин или пароль';
+        });
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        setState(() {
+          _loginStatus = 'Неверный логин или пароль';
+        });
+      } else if (e.code == 'wrong-password') {
+        setState(() {
+          _loginStatus = 'Неверный логин или пароль';
+        });
+      } else {
+        setState(() {
+          _loginStatus = 'Ошибка при входе: $e';
+        });
+      }
+    }
+  }
+
+  Future<bool> _checkToken(String token, udid ) async {
+    DatabaseEvent event = await _database.ref().child('users').child(token).once();
+    DataSnapshot snapshot = event.snapshot;
+    print(snapshot.value);
+    if (snapshot.value == null) {
+      print('Данные не найдены в базе данных');
+      return false;
+    } else {
+      Map<dynamic, dynamic>? data = snapshot.value as Map<dynamic, dynamic>?;
+      if (data != null && data['udid'] == udid ) {
+        return true;
+      } else {
+        print('Устройство не авторизовано');
+        return false;
+      }
+    }
+  }
+  Future<void> _register() async {
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() {
+        _loginStatus = 'Введите имя пользователя и пароль';
+      });
+      return;
+    }
+    String udid = await FlutterUdid.udid;
+
+    try {
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      String token = userCredential.user!.uid;
+      FirebaseDatabase.instance.ref().child('users').child(token).set({
+        'email': email,
+        'token': token,
+        'udid': udid,
+        // здесь вы можете добавить дополнительные данные пользователя
+      });
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen(dir: someDirectory)),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'weak-password') {
+        showToast('Слабый пароль');
+        setState(() {
+          _loginStatus = 'Слабый пароль';
+        });
+      } else if (e.code == 'email-already-in-use') {
+        showToast('Пользователь уже существует');
+        setState(() {
+          _loginStatus = 'Пользователь уже существует';
+        });
+      } else {
+        showToast('Ошибка при регистрации: $e');
+        setState(() {
+          _loginStatus = 'Ошибка при регистрации: $e';
+        });
+      }
+    }
+  }
+
 
   Future<bool> checkInternetConnection() async {
     var connectivityResult = await (Connectivity().checkConnectivity());
@@ -62,6 +212,20 @@ class _LoginPageState extends State<LoginPage> {
       return true;
     }
     return false;
+  }
+
+
+
+
+  void showToast(String message) {
+    Fluttertoast.showToast(
+        msg: message,
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 4, // время задержки в секундах
+        backgroundColor: Colors.grey,
+        textColor: Colors.white,
+        fontSize: 12.0);
   }
 
   @override
@@ -74,121 +238,202 @@ class _LoginPageState extends State<LoginPage> {
       ),
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Image.asset(
-                        'assets/images/auth.png',
-                        height: 300,
-                        width: 300,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Авторизация',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Container(
-                        width: 350,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.grey,
-                            width: 1,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
+          child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Center(
+                      child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: <Widget>[
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              child: TextField(
-                                controller: usernameController,
-                                decoration: InputDecoration(
-                                    hintText: 'Ваше имя'),
-                                textInputAction: TextInputAction.done,
+                            Image.asset(
+                              'assets/images/auth.png',
+                              height: 300,
+                              width: 300,
+                            ),
+                            const SizedBox(height: 5),
+                            const Text(
+                              'Авторизация',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              child: TextField(
-                                controller: passwordController,
-                                decoration: InputDecoration(
-                                    hintText: 'Ваш пароль'),
-                                obscureText: true,
-                                textInputAction: TextInputAction.done,
-                              ),
-                            ),
-                            SizedBox(height: 6),
-                            ElevatedButton(
-                              onPressed: _login,
-                              child: Text('Авторизироваться'),
-                              style: ElevatedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                            const SizedBox(height: 16),
+                            Container(
+                              width: 350,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.grey,
+                                  width: 1,
                                 ),
-                                padding:
-                                EdgeInsets.symmetric(
-                                    vertical: 16, horizontal: 24),
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            ),
-                            SizedBox(height: 6),
-                          ],
-                        ),
+                              child: Column(
+                                children: <Widget>[
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: TextField(
+                                      controller: _emailController,
+                                      decoration:
+                                      const InputDecoration(hintText: 'Ваша почта'),
+                                      textInputAction: TextInputAction.done,
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: TextField(
+                                      controller: _passwordController,
+                                      decoration:
+                                      const InputDecoration(hintText: 'Ваш пароль'),
+                                      obscureText: true,
+                                      textInputAction: TextInputAction.done,
+                                      onSubmitted: (value) {
+                                        // Implement your logic when user submits the password
+                                      },
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 5),
+                                  //ЧЕЕЕЕЕЕТБОКС
+                                  Row(
+                                    children: [
+                                      Theme(
+                                        data: ThemeData(
+                                          checkboxTheme: CheckboxThemeData(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(5),
+                                              side: BorderSide(width: 1, color: Colors.blue), // устанавливаем толщину и цвет границы
+                                            ),
+                                          ),
+                                        ),
+                                        child: Checkbox(
+                                          value: _rememberMe,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              _rememberMe = value ?? false; // если value равно null, то _rememberMe присваивается значение false
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      Text('Запомнить меня'),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      if (_formKey.currentState?.validate() ?? false) {
+                                        _saveData();
+                                        // TODO: Perform login
+                                      }
+                                      bool isConnected = await checkInternetConnection();
+                                      if (!isConnected) {
+                                        setState(() {
+                                          _loginStatus = 'Отсутствует подключение к интернету';
+                                        });
+                                        return;
+                                      }
+                                      await _login();
+                                    },
+                                    child: const Text('Авторизация'),
+                                    style: ButtonStyle(
+                                      fixedSize: MaterialStateProperty.all(Size(200, 42)), // задаем размеры кнопки
+                                      shape: MaterialStateProperty.all(RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(25.0), // указываем радиус скругления углов
+                                      )),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      bool isConnected = await checkInternetConnection();
+                                      if (!isConnected) {
+                                        setState(() {
+                                          _loginStatus = 'Отсутствует подключение к интернету';
+                                        });
+                                        return;
+                                      }
+                                      try {
+                                        UserCredential userCredential =
+                                        await _auth.createUserWithEmailAndPassword(
+                                          email: _emailController.text,
+                                          password: _passwordController.text,
+                                        );
+                                        String token = userCredential.user!.uid;
+                                        String udid = await FlutterUdid.udid;
+                                        FirebaseDatabase.instance.ref().child('users').child(token).update({
+                                          'email': _emailController.text,
+                                          'token': token,
+                                          'udid': udid,
+                                          // здесь вы можете добавить дополнительные данные пользователя
+                                        });
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => HomeScreen(dir: someDirectory)),
+                                        );
+                                      } on FirebaseAuthException catch (e) {
+                                        if (e.code == 'weak-password') {
+                                              showToast('Пароль должен состаять минимум из шести символов');
+                                              setState(() {
+                                                _loginStatus = 'Слабый пароль';
+                                              });
+                                        } else if (e.code == 'email-already-in-use') {
+                                          showToast('Этот пользователь уже зарегистрирован');
+                                          setState(() {
+                                            _loginStatus = 'Пользователь уже существует';
+                                          });
+                                        } else if (e.code == 'invalid-email') {
+                                          showToast('Неправильный формат почты');
+                                          setState(() {
+                                            _loginStatus = 'Неправильный формат почты';
+                                          });
+                                        } else {
+                                          showToast('Ошибка при регистрации. Укажите почту и пароль минимум из 6 символов');
+                                          setState(() {
+                                            _loginStatus = 'Ошибка при регистрации: $e';
+                                          });
+                                        }
+                                      } catch (e) {
+                                        showToast('Ошибка при регистрации. Укажите почту и пароль минимум из 6 символов');
+                                        setState(() {
+                                          _loginStatus = 'Ошибка при регистрации: $e';
+                                        });
+                                      }
+                                    },
+                                    child: const Text('Регистрация'),
+                                    style: ButtonStyle(
+                                      backgroundColor: MaterialStateProperty.all<Color>(Colors.grey),
+                                      fixedSize: MaterialStateProperty.all(Size(200, 42)), // задаем размеры кнопки
+                                      shape: MaterialStateProperty.all(RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(25.0), // указываем радиус скругления углов
+                                      )),
+                                        ),
+                                      ),
+                                  const SizedBox(height: 5),
+                                    ],
+                                  ),
+                                ),
+                        ]
                       ),
-                      SizedBox(height: 16),
-                      if (_loginStatus.isNotEmpty)
-                        Dismissible(
-                          key: Key('error'),
-                          direction: DismissDirection.down,
-                          onDismissed: (direction) {
-                            setState(() {
-                              _loginStatus = '';
-                            });
-                          },
-                          child: Container(
-                            width: 400,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Center(
-                                child: Text(
-                                  _loginStatus,
-                                  style: TextStyle(color: Colors.black54),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      SizedBox(height: 16),
-                    ],
+                    ),
+                  ),
+              ),
+                Container(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Служба поддержки example@gmail.com',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.only(bottom: 16),
-              child: Text(
-                'Служба поддержки example@gmail.com',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
+              ],
+          ),
       ),
     );
   }
