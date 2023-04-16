@@ -1,18 +1,29 @@
-
-
-
 import 'package:flutter/material.dart';
-import 'package:vambaalkon2/auth.dart';
-import 'package:vambaalkon2/splash_screen.dart';
-import 'package:vambaalkon2/screen_1.dart';
-//import 'package:phone_otp_ui/screen_2.dart';
-import 'package:flutter/foundation.dart';
-
+import 'package:vambaalkon2/startScreenAndAuth/auth.dart';
+import 'package:vambaalkon2/startScreenAndAuth/splash_screen.dart';
+import 'package:vambaalkon2/screen/screen_1.dart';
 import 'dart:async';
+import 'package:vambaalkon2/HomeScreen.dart';
+import 'dart:io';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() {
+
+
+void main() async {
+  FirebaseOptions options = const FirebaseOptions(
+    appId: '1:62754477829:android:5ce15231d0dfb4b593c96c',
+    apiKey: 'AIzaSyDY4K_pITwRbCwqT5E053gNzgtQFHlR2Us',
+    projectId: 'vam-balkon2',
+    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  );
+
+  // Инициализация Firebase
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: options);
+
   runApp(MyApp());
 }
+
 
 class MyApp extends StatefulWidget {
   @override
@@ -21,11 +32,13 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   bool _isLoading = true;
+  Directory someDirectory = Directory('/path/to/directory');
 
   @override
   void initState() {
     super.initState();
-    Timer(Duration(seconds: 3), () {
+    // Имитация задержки для SplashScreen
+    Future.delayed(const Duration(seconds: 3), () {
       setState(() {
         _isLoading = false;
       });
@@ -42,8 +55,9 @@ class _MyAppState extends State<MyApp> {
       ),
       home: _isLoading ? SplashScreen() : LoginPage(),
       routes: {
-        '/screen1': (context) => Screen1(),
-        //'/screen2': (context) => BalconyInsideScreen(),
+        '/screen1': (context) => const Screen1(),
+        '/home': (context) => HomeScreen(dir: someDirectory),
+        '/auth': (context) => LoginPage(),
       },
     );
   }
