@@ -42,13 +42,22 @@ class _LoginPageState extends State<LoginPage> {
       _rememberMe = true;
     }
   }
+  void checkCurrentUser() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      // пользователь уже авторизован, переходим на главный экран приложения
+      Navigator.of(context).pushReplacementNamed('/home');
+    } else {
+      // пользователь не авторизован, ничего не делаем
+    }
+  }
 
   bool _rememberMe = false;
   @override
   void initState() {
     super.initState();
     _loadSavedData();
-    autoFillCredentials();
+    checkCurrentUser();
 
   }
 
@@ -295,41 +304,13 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
 
                                   const SizedBox(height: 5),
-                                  //ЧЕЕЕЕЕЕТБОКС
-                                  Row(
-                                    children: [
-                                      Theme(
-                                        data: ThemeData(
-                                          checkboxTheme: CheckboxThemeData(
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(5),
-                                              side: BorderSide(width: 1, color: Colors.blue), // устанавливаем толщину и цвет границы
-                                            ),
-                                          ),
-                                        ),
-                                        child: Checkbox(
-                                          value: _rememberMe,
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _rememberMe = value ?? false; // если value равно null, то _rememberMe присваивается значение false
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                      Text('Запомнить меня'),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 5),
 
                                   ElevatedButton(
                                     onPressed: () async {
-                                      if (_formKey.currentState?.validate() ?? false) {
-                                        _saveData();
-                                        // TODO: Perform login
-                                      }
                                       bool isConnected = await checkInternetConnection();
                                       if (!isConnected) {
                                         setState(() {
+                                          showToast('Отсутствует подключение к интернету');
                                           _loginStatus = 'Отсутствует подключение к интернету';
                                         });
                                         return;
@@ -351,6 +332,7 @@ class _LoginPageState extends State<LoginPage> {
                                       bool isConnected = await checkInternetConnection();
                                       if (!isConnected) {
                                         setState(() {
+                                          showToast('Отсутствует подключение к интернету');
                                           _loginStatus = 'Отсутствует подключение к интернету';
                                         });
                                         return;
